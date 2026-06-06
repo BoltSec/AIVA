@@ -99,7 +99,7 @@ A LangGraph-based multi-agent vulnerability assessment pipeline.
 ### Features
 
 - Parse scanner findings
-- Resolve Plugin IDs to CVEs
+- Resolve Plugin IDs to CVE
 - Retrieve CVSS scores
 - Retrieve EPSS exploit probabilities
 - Check CISA KEV status
@@ -171,7 +171,9 @@ Computes a custom priority score and ranks findings.
 
 ### Priority Score Formula
 
+```python
 priority_score = (CVSS × 10) × (0.5 + 0.5 × EPSS) × KEV_boost × asset_criticality
+```
 
 Where:
 
@@ -285,43 +287,6 @@ Generate remediation plan
 
 ---
 
-# Analytics Dashboard
-
-The platform includes post-scan analytics.
-
-### Severity Distribution
-
-Donut chart displaying:
-
-- Critical
-- High
-- Medium
-- Low
-
-### EPSS Distribution
-
-Bar chart displaying exploit probability ranges:
-
-- 0–25%
-- 25–50%
-- 50–75%
-- 75–100%
-
-### Priority Score Distribution
-
-Bar chart displaying:
-
-- 0–25
-- 25–50
-- 50–75
-- 75–100
-
-### KEV Counter
-
-Displays the number of actively exploited vulnerabilities present in the scan.
-
----
-
 # Technology Stack
 
 | Layer | Technology |
@@ -344,7 +309,7 @@ Displays the number of actively exploited vulnerabilities present in the scan.
 
 | Source | Data | Authentication |
 |----------|----------|----------|
-| NIST NVD API | CVSS scores, CVE descriptions | Optional API Key |
+| NIST NVD API | CVSS scores, CVE descriptions | Required API Key |
 | FIRST EPSS API | Exploit probability | None |
 | CISA KEV Catalog | Known exploited vulnerabilities | None |
 | OSV.dev API | Dependency vulnerabilities | None |
@@ -420,7 +385,6 @@ This ensures reproducibility and auditability.
 The platform can operate without:
 
 - Internet access
-- API keys
 - External services
 
 using local fixtures and offline intelligence data.
@@ -465,17 +429,21 @@ ensuring consistent data structures and scoring logic.
 
 ## NVD API Key
 
-Optional but recommended.
+Required.
 
-Benefits:
+AIVA uses the NIST NVD API to retrieve:
 
-- Higher rate limits
-- Faster CVE enrichment
-- Better scalability
+- CVSS Scores
+- CVE Descriptions
+- Vulnerability Metadata
+
+Configure:
 
 ```env
 NVD_API_KEY=your_api_key
 ```
+
+The platform will not perform live vulnerability enrichment without a valid NVD API key.
 
 ---
 
@@ -533,14 +501,3 @@ If no provider is configured:
 
 ---
 
-# License
-
-MIT License
-
----
-
-# Author
-
-AIVA — AI-powered Vulnerability Assessment Platform
-
-Bridging the gap between vulnerability detection and vulnerability prioritization.
