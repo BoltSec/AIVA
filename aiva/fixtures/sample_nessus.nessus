@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<NessusClientData_v2>
+  <Report name="Nightly Scan">
+    <ReportHost name="10.0.2.5">
+      <ReportItem pluginID="71011" pluginName="MS17-010 SMBv1 RCE" severity="4" port="445">
+        <cve>CVE-2017-0144</cve>
+        <cvss_base_score>8.1</cvss_base_score>
+      </ReportItem>
+      <ReportItem pluginID="91000" pluginName="Netlogon Zerologon" severity="4" port="445">
+        <cve>CVE-2020-1472</cve>
+        <cvss3_base_score>10.0</cvss3_base_score>
+      </ReportItem>
+    </ReportHost>
+    <ReportHost name="10.0.3.9">
+      <ReportItem pluginID="93000" pluginName="PHP-FPM RCE" severity="4" port="9000">
+        <cve>CVE-2019-11043</cve>
+        <cvss3_base_score>9.8</cvss3_base_score>
+      </ReportItem>
+    </ReportHost>
+  </Report>
+</NessusClientData_v2>

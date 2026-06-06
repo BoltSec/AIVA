@@ -1,0 +1,40 @@
+{
+  "PyPI:flask:0.12.0": [
+    {
+      "id": "GHSA-5wv5-4vpf-pj6m",
+      "summary": "Flask denial of service via crafted JSON",
+      "severity": [{"type": "CVSS_V3", "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"}],
+      "affected": [{"ranges": [{"events": [{"introduced": "0"}, {"fixed": "0.12.3"}]}]}],
+      "references": [{"url": "https://osv.dev/GHSA-5wv5-4vpf-pj6m"}]
+    }
+  ],
+  "PyPI:requests:2.19.0": [
+    {
+      "id": "GHSA-x84v-xcm2-53pg",
+      "summary": "Requests leaks Authorization header on redirect",
+      "severity": [{"type": "CVSS_V3", "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N"}],
+      "affected": [{"ranges": [{"events": [{"introduced": "0"}, {"fixed": "2.20.0"}]}]}],
+      "references": [{"url": "https://osv.dev/GHSA-x84v-xcm2-53pg"}]
+    }
+  ],
+  "PyPI:jinja2:2.10.0": [
+    {
+      "id": "GHSA-462w-v97r-4m45",
+      "summary": "Jinja2 sandbox escape via str.format",
+      "severity": [{"type": "CVSS_V3", "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}],
+      "affected": [{"ranges": [{"events": [{"introduced": "0"}, {"fixed": "2.10.1"}]}]}],
+      "references": [{"url": "https://osv.dev/GHSA-462w-v97r-4m45"}]
+    }
+  ],
+  "PyPI:urllib3:1.24.0": [],
+  "npm:lodash:4.17.10": [
+    {
+      "id": "GHSA-jf85-cpcp-j695",
+      "summary": "lodash prototype pollution",
+      "database_specific": {"severity": "HIGH"},
+      "affected": [{"ranges": [{"events": [{"introduced": "0"}, {"fixed": "4.17.12"}]}]}],
+      "references": [{"url": "https://osv.dev/GHSA-jf85-cpcp-j695"}]
+    }
+  ],
+  "npm:express:4.16.0": []
+}
