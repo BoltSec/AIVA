@@ -1,126 +1,546 @@
-# Dependency Risk Platform
+# AIVA — AI-powered Vulnerability Assessment Platform
 
-Dual-purpose security tooling:
+## Overview
 
-- **Component A — Dependency Risk Dashboard** (`dashboard/`): FastAPI web app.
-  Upload `requirements.txt` / `package.json`, get an A–F risk grade + PDF report.
-- **Component B — AIVA** (`aiva/`): LangGraph CLI pipeline. Digests Nessus /
-  OpenVAS XML, enriches with NVD + EPSS + CISA KEV, outputs a prioritized
-  remediation plan (JSON + PDF).
+AIVA is a dual-component Python cybersecurity platform designed to solve a major limitation of traditional vulnerability scanners such as Nessus and OpenVAS.
 
-Both share `shared/` (models, grading formulas, PDF generation).
+While scanners successfully identify vulnerabilities, they do not effectively answer the most important question:
 
-## Where to put your credentials (read this)
+> What should be fixed first?
 
-There is exactly **one secret** in this project: your NVD API key. Everything
-else is keyless.
+AIVA enriches scanner findings with real-world exploit intelligence and re-ranks vulnerabilities based on actual danger rather than theoretical severity alone.
 
-1. Copy `.env.example` to `.env` and edit it:
-   ```
-   cp .env.example .env
-   ```
-2. **NVD key** → put your rotated key on the `NVD_API_KEY` line in `.env`.
-   The code reads it via `os.getenv("NVD_API_KEY")` — never hard-code it.
-3. **CISA KEV file** → drop your downloaded
-   `known_exploited_vulnerabilities.json` into `config/`, then point
-   `AIVA_KEV_FILE` at it in `.env`. AIVA uses that local file instead of
-   re-downloading from CISA. (A small `config/sample_kev.json` is included so
-   you can test the path immediately.)
-4. Load the file before running, e.g. `set -a; source .env; set +a`.
+The platform consists of two integrated components:
 
-OSV, EPSS, and the live CISA fetch need no credentials at all.
+### Component A — Dependency Risk Dashboard
 
-## Turning on the AI agent (FREE)
+A FastAPI web application for developers that analyzes dependency files and provides security risk grading.
 
-By default AIVA's recommendations are deterministic templates. To make the
-Recommendation agent *reason* — tailored remediation per CVE/host plus an
-executive summary — point it at a free LLM provider. Gemini's free tier is the
-most generous (no credit card):
+### Component B — AIVA (AI Vulnerability Assessment Agent)
 
-```
-AIVA_LLM_PROVIDER=gemini          # gemini | groq | openrouter | ollama | openai
-GEMINI_API_KEY=...                # free at https://aistudio.google.com
-```
+A LangGraph-powered agentic pipeline that processes Nessus and OpenVAS reports, enriches findings with threat intelligence, prioritizes remediation efforts, and generates AI-assisted recommendations.
 
-Other free options: `groq` (fastest, key at console.groq.com), `openrouter`
-(many free models), or `ollama` (fully local, no key, no network). Switching
-providers is one env var — the code is provider-agnostic (OpenAI-compatible).
+---
 
-What stays deterministic: parsing, scoring, and ranking. The LLM never decides
-priority — it only explains and advises — so rankings remain reproducible and
-auditable. With no key, AIVA falls back to the template recommendations and
-still runs (and all tests pass).
+# Problem Statement
 
-## Setup
+Organizations running vulnerability scans often receive hundreds or thousands of findings.
 
-```bash
-pip install -r requirements.txt
-```
+Most scanners rank findings solely using CVSS scores, which introduces several challenges:
 
-## Test (offline, no network/keys)
+- A CVSS 9.8 vulnerability with little or no exploitation activity may rank above a CVSS 7.5 vulnerability actively exploited by attackers.
+- No visibility into whether a vulnerability appears on CISA's Known Exploited Vulnerabilities (KEV) Catalog.
+- Generic remediation recommendations that ignore asset importance and context.
+- Raw XML reports require expert interpretation.
+- No executive-friendly summary for management or non-technical stakeholders.
 
-```bash
-pytest -q          # 10 tests, full pipeline + API
-```
+As a result, security teams often struggle to determine which vulnerabilities present the greatest real-world risk.
 
-## Run AIVA
+---
 
-```bash
-# offline (uses aiva/fixtures/offline_intel.json)
-python -m aiva.cli scan aiva/fixtures/sample_openvas.xml \
-    --asset 10.0.1.21=2.0 --json plan.json --pdf plan.pdf
+# Proposed Solution
 
-# live threat intel (needs outbound network; NVD key optional)
-export AIVA_INTEL_MODE=live
-export NVD_API_KEY=...        # optional, raises rate limit
-python -m aiva.cli scan report.nessus --mode live --pdf plan.pdf
-```
+AIVA enriches vulnerability findings using multiple threat intelligence sources and prioritizes vulnerabilities using a custom scoring formula that incorporates:
 
-`--asset host=criticality` weights ranking (0.5 low … 2.0 crown-jewel).
+- CVSS Severity
+- EPSS Exploit Probability
+- CISA Known Exploited Vulnerabilities (KEV)
+- Asset Criticality
 
-## Run Dashboard
+This enables organizations to focus remediation efforts on vulnerabilities that pose the highest practical risk.
 
-```bash
-uvicorn dashboard.main:app --reload
-# open http://127.0.0.1:8000   (demo key: dev-key-001)
-```
+---
 
-Live OSV.dev instead of fixtures:
+# Component A — Dependency Risk Dashboard
 
-```bash
-export DASH_OSV_MODE=live
-uvicorn dashboard.main:app
+A FastAPI-based web application designed for developers.
+
+### Features
+
+- Upload Python `requirements.txt`
+- Upload Node.js `package.json`
+- Analyze dependencies against OSV.dev
+- Identify known vulnerable packages
+- Generate an overall A–F security grade
+- Generate downloadable PDF reports
+
+### Workflow
+
+```text
+Dependency File
+      │
+      ▼
+ Dependency Parser
+      │
+      ▼
+    OSV.dev
+      │
+      ▼
+ Risk Assessment
+      │
+      ▼
+   Grade (A-F)
+      │
+      ▼
+   PDF Report
 ```
 
-Demo API keys (`dashboard/auth.py`): `dev-key-001` (developer),
-`admin-key-001` (admin). Send as `X-API-Key` header.
+---
 
-## How the pieces connect
+# Component B — AIVA (AI Vulnerability Assessment Agent)
 
+A LangGraph-based multi-agent vulnerability assessment pipeline.
+
+### Supported Inputs
+
+- Nessus XML Reports
+- OpenVAS XML Reports
+
+### Features
+
+- Parse scanner findings
+- Resolve Plugin IDs to CVEs
+- Retrieve CVSS scores
+- Retrieve EPSS exploit probabilities
+- Check CISA KEV status
+- Prioritize findings
+- Generate AI-assisted remediation recommendations
+- Generate executive summaries
+- Export PDF remediation plans
+
+---
+
+# AI Agent Pipeline (LangGraph — 7 Nodes)
+
+## 1. Parser Agent
+
+Reads Nessus/OpenVAS XML reports and extracts all findings.
+
+**Output:**
+
+```python
+Finding[]
 ```
-shared/models.py    one vocabulary for both components
-shared/grading.py   grade_scan()  -> A–F   |   priority_score() -> ranking
-shared/pdf_report.py both PDF outputs
 
-aiva/parsers.py     Nessus + OpenVAS XML -> Finding[]
-aiva/clients.py     NVD / EPSS / KEV   (offline | live)
-aiva/agents.py      5 agent node functions
-aiva/pipeline.py    LangGraph StateGraph wiring + run_pipeline()
-aiva/cli.py         Typer CLI
+---
 
-dashboard/parsers.py  requirements.txt / package.json -> Package[]
-dashboard/osv.py      OSV.dev          (offline | live)
-dashboard/auth.py     RBAC + audit log
-dashboard/main.py     FastAPI: /scan, /report/{id}.pdf, /audit
+## 2. Resolver Agent
+
+Maps scanner Plugin IDs to CVE identifiers.
+
+```text
+Plugin ID → CVE
 ```
 
-## Before production (hardening checklist)
+---
 
-- Replace in-memory `_scans`, `_audit`, `_USERS` with a real DB + user store.
-- Add `defusedxml` for parsing untrusted scanner XML.
-- Add retry/backoff + response caching on the NVD/EPSS/OSV clients (they
-  rate-limit hard at scale).
-- Rate-limit `/scan`; scan uploads for zip-bombs beyond the 2 MB cap.
-- The priority score clamps at 100 — lift the cap in `shared/grading.py` if you
-  want finer separation among top KEV findings.
+## 3. Context Agent
+
+Retrieves vulnerability context from the NIST NVD database.
+
+Provides:
+
+- CVSS Score
+- CVE Description
+
+Source:
+
+- NIST NVD API
+
+---
+
+## 4. Exploitability Agent
+
+Retrieves real-world exploitation intelligence.
+
+Provides:
+
+- EPSS Score
+- CISA KEV Status
+
+Sources:
+
+- FIRST EPSS
+- CISA KEV
+
+---
+
+## 5. Prioritization Agent
+
+Computes a custom priority score and ranks findings.
+
+### Priority Score Formula
+
+priority_score = (CVSS × 10) × (0.5 + 0.5 × EPSS) × KEV_boost × asset_criticality
+
+Where:
+
+- CVSS × 10 → Impact
+- EPSS → Exploit likelihood
+- KEV Boost → Active exploitation indicator
+- Asset Criticality → Business importance
+
+### KEV Boost
+
+```python
+1.5
 ```
+
+Applied when:
+
+```text
+CVE exists in the CISA KEV Catalog
+```
+
+### Asset Criticality Examples
+
+| Asset Type | Weight |
+|------------|---------|
+| Standard Host | 1.0 |
+| Important Server | 1.5 |
+| Crown Jewel Asset | 2.0 |
+
+Final score is capped at:
+
+```python
+100
+```
+
+---
+
+## 6. Recommendation Agent
+
+Uses an LLM to generate:
+
+- Host-specific remediation guidance
+- Patch recommendations
+- Risk explanations
+- Actionable security recommendations
+
+Important:
+
+The LLM does not participate in prioritization.
+
+Prioritization remains deterministic and auditable.
+
+---
+
+## 7. Summary Agent
+
+Generates an executive-level security summary.
+
+Provides:
+
+- Overall risk posture
+- Critical vulnerabilities overview
+- Prioritized remediation roadmap
+- Management briefing
+
+---
+
+# Concurrent Processing
+
+The Context and Exploitability stages operate concurrently using:
+
+```python
+asyncio.gather()
+```
+
+This significantly improves enrichment performance across large vulnerability datasets.
+
+---
+
+# Interactive AI Chat
+
+After a scan is completed, users can interact with the system using natural language.
+
+Examples:
+
+```text
+Show top 10 findings
+```
+
+```text
+Show KEV vulnerabilities only
+```
+
+```text
+Explain CVE-2025-XXXX
+```
+
+```text
+Re-rank findings using asset criticality 2.0
+```
+
+```text
+Generate remediation plan
+```
+
+### Safety Rules
+
+- Refuses unrelated questions
+- Uses scan results as grounding context
+- Fetches live vulnerability information when available
+- Never relies solely on model memory
+
+---
+
+# Analytics Dashboard
+
+The platform includes post-scan analytics.
+
+### Severity Distribution
+
+Donut chart displaying:
+
+- Critical
+- High
+- Medium
+- Low
+
+### EPSS Distribution
+
+Bar chart displaying exploit probability ranges:
+
+- 0–25%
+- 25–50%
+- 50–75%
+- 75–100%
+
+### Priority Score Distribution
+
+Bar chart displaying:
+
+- 0–25
+- 25–50
+- 50–75
+- 75–100
+
+### KEV Counter
+
+Displays the number of actively exploited vulnerabilities present in the scan.
+
+---
+
+# Technology Stack
+
+| Layer | Technology |
+|---------|------------|
+| Web API | FastAPI |
+| Server | Uvicorn |
+| Agent Framework | LangGraph (StateGraph) |
+| Data Validation | Pydantic v2 |
+| HTTP Client | httpx |
+| XML Parsing | defusedxml |
+| PDF Generation | ReportLab |
+| CLI | Typer |
+| Testing | pytest |
+| Threat Intelligence | NVD, EPSS, KEV |
+| LLM Providers | Groq, Gemini, OpenRouter, Ollama, OpenAI |
+
+---
+
+# External Data Sources
+
+| Source | Data | Authentication |
+|----------|----------|----------|
+| NIST NVD API | CVSS scores, CVE descriptions | Optional API Key |
+| FIRST EPSS API | Exploit probability | None |
+| CISA KEV Catalog | Known exploited vulnerabilities | None |
+| OSV.dev API | Dependency vulnerabilities | None |
+
+---
+
+# LLM Provider Support
+
+AIVA is provider-agnostic.
+
+Supported providers:
+
+- Groq
+- Gemini
+- OpenRouter
+- Ollama
+- OpenAI
+
+Switching providers requires changing a single environment variable.
+
+Example:
+
+```env
+AIVA_LLM_PROVIDER=groq
+```
+
+or
+
+```env
+AIVA_LLM_PROVIDER=gemini
+```
+
+### Recommended Configuration
+
+For free usage:
+
+- Gemini Free Tier
+
+For production demos:
+
+- Groq
+
+For fully offline operation:
+
+- Ollama
+
+---
+
+# Key Design Decisions
+
+## Deterministic + AI Hybrid
+
+The platform separates:
+
+### Deterministic Components
+
+- Parsing
+- Scoring
+- Ranking
+
+### AI Components
+
+- Recommendations
+- Explanations
+- Executive Summaries
+
+This ensures reproducibility and auditability.
+
+---
+
+## Offline-First Design
+
+The platform can operate without:
+
+- Internet access
+- API keys
+- External services
+
+using local fixtures and offline intelligence data.
+
+---
+
+## Provider-Agnostic LLM Layer
+
+Supports multiple providers without code changes.
+
+---
+
+## Shared Architecture
+
+Both platform components use:
+
+```text
+shared/models.py
+shared/grading.py
+shared/pdf_report.py
+```
+
+ensuring consistent data structures and scoring logic.
+
+---
+
+# Novelty Over Existing Tools
+
+| Existing Scanners | AIVA |
+|------------------|-------|
+| CVSS-only ranking | CVSS + EPSS + KEV + Asset Criticality |
+| Severity labels | Real exploit probability |
+| No KEV awareness | CISA KEV integration |
+| Generic remediation | AI-generated remediation |
+| Raw XML reports | Executive summaries |
+| Plugin IDs | Plugin-to-CVE resolution |
+| Static reports | Interactive AI chat |
+
+---
+
+# Credentials and Configuration
+
+## NVD API Key
+
+Optional but recommended.
+
+Benefits:
+
+- Higher rate limits
+- Faster CVE enrichment
+- Better scalability
+
+```env
+NVD_API_KEY=your_api_key
+```
+
+---
+
+## CISA KEV Catalog
+
+Recommended for offline mode.
+
+Place:
+
+```text
+config/known_exploited_vulnerabilities.json
+```
+
+and configure:
+
+```env
+AIVA_KEV_FILE=config/known_exploited_vulnerabilities.json
+```
+
+---
+
+## LLM API Key
+
+Choose one provider:
+
+```env
+AIVA_LLM_PROVIDER=gemini
+GEMINI_API_KEY=...
+```
+
+or
+
+```env
+AIVA_LLM_PROVIDER=groq
+GROQ_API_KEY=...
+```
+
+If no provider is configured:
+
+- Prioritization still works
+- Reports still generate
+- Recommendations fall back to deterministic templates
+
+---
+
+# Future Enhancements
+
+- MITRE ATT&CK Mapping
+- Threat Hunting Integration
+- SIEM Integration
+- Continuous Monitoring
+- Multi-Scanner Support
+- Database-backed RBAC
+- CVE Trend Forecasting
+
+---
+
+# License
+
+MIT License
+
+---
+
+# Author
+
+AIVA — AI-powered Vulnerability Assessment Platform
+
+Bridging the gap between vulnerability detection and vulnerability prioritization.
